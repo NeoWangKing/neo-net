@@ -183,8 +183,8 @@ Xor learn(Xor m, Xor g, float rate)
 
 int main(void)
 {
-  // srand(time(0));
-  srand(69);
+  srand(time(0));
+  // srand(69);
   Xor m = rand_xor();
   // print_xor(m);
   // printf("---------------------------------\n");
