@@ -10,14 +10,6 @@ float sigmoidf(float x)
 
 typedef float sample[3];
 
-float train_twice[][2] = {
-  {0, 0},
-  {1, 2},
-  {2, 4},
-  {3, 6},
-  {4, 8},
-};
-
 // OR-gate
 sample train_or[] = {
   {0, 0, 0},
@@ -50,7 +42,7 @@ sample train_xor[] = {
   {1, 1, 0},
 };
 
-sample *train = train_xor;
+sample *train = train_or;
 size_t train_count = 4;
 // #define train_count (sizeof(train)/sizeof(train[0]))
 
@@ -74,6 +66,40 @@ float cost(float w1, float w2, float b)
   return result;
 }
 
+void dcost(float eps,
+           float w1, float w2, float b,
+           float *dw1, float *dw2, float *db)
+{
+  float c = cost(w1, w2, b);
+  *dw1 = (cost(w1 + eps, w2, b) - c)/eps;
+  *dw2 = (cost(w1, w2 + eps, b) - c)/eps;
+  *db  = (cost(w1, w2, b + eps) - c)/eps;
+}
+
+void gcost(float w1, float w2, float b,
+           float *dw1, float *dw2, float *db)
+{
+  *dw1 = 0;
+  *dw2 = 0;
+  *db  = 0;
+
+  size_t n = train_count;
+  for (size_t i = 0; i < n; ++i) {
+    float xi = train[i][0];
+    float yi = train[i][1];
+    float zi = train[i][2];
+    float ai = sigmoidf(xi*w1 + yi*w2 + b);
+    float di = 2*(ai - zi)*ai*(1 - ai);
+    *dw1 += di*xi;
+    *dw2 += di*yi;
+    *db  += di;
+  }
+  *dw1 /= n;
+  *dw2 /= n;
+  *db  /= n;
+}
+  
+
 int main()
 {
   // y = x*w + b;
@@ -85,18 +111,24 @@ int main()
   float b  = rand_float(); 
   // printf("%f\n", w);
 
-  float eps = 1e-3;
   float rate = 1e-1;
 
   for (size_t i = 0; i < 100*1000; ++i) {
-    // printf("w1: %f, w2: %f, b: %f, cost: %f\n", w1, w2, b, cost(w1, w2, b));
     float c = cost(w1, w2, b);
-    float dw1 = (cost(w1 + eps, w2, b) - c)/eps;
-    float dw2 = (cost(w1, w2 + eps, b) - c)/eps;
-    float db  = (cost(w1, w2, b + eps) - c)/eps;
-    w1 -= rate * dw1;
-    w2 -= rate * dw2;
-    b  -= rate * db;
+    printf("cost: %f, w1: %f, w2: %f, b: %f\n", c, w1, w2, b);
+
+    float dw1, dw2, db;
+
+#if 1
+    float eps = 1e-1;
+    dcost(eps, w1, w2, b, &dw1, &dw2, &db);
+#else
+    gcost(w1, w2, b, &dw1, &dw2, &db);
+#endif
+    w1 -= rate*dw1;
+    w2 -= rate*dw2;
+    b  -= rate*db;
+
   }
   printf("--------------------------------------\n");
 
