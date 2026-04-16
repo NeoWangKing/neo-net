@@ -30,6 +30,10 @@ int main(void)
   NN g  = nn_alloc(arch, ARRAY_LEN(arch));
   nn_rand(nn, 0, 1);
 
+  NN_PRINT(nn);
+
+  return 0;
+
   float rate = 1;
 
   printf("cost = %f\n", nn_cost(nn, ti, to));

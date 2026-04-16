@@ -36,6 +36,7 @@ int main(void)
   srand(time(0));
 
   size_t arch[] = {2*BITS, 4*BITS, BITS + 1};
+  // size_t arch[] = {28*28, 16, 16, 10};
 
   NN nn = nn_alloc(arch, ARRAY_LEN(arch));
   NN g = nn_alloc(arch, ARRAY_LEN(arch));
