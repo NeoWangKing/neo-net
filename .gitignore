@@ -1,7 +1,9 @@
+*
+
 !.gitignore
 !*.c
 !*.h
-
-build/
-
-*.bak
+!*.sh
+!*.arch
+!*.mat
+!pdf/
