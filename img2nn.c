@@ -148,32 +148,11 @@ int main(int argc, char **argv)
             MAT_AT(t, i, 2) = img_pixels[i]/255.f;
         }
     }
+    mat_shuffle_rows(t);
 
-    Mat ti = {
-        .rows = t.rows,
-        .cols = 2,
-        .stride = t.stride,
-        .es = &MAT_AT(t, 0, 0),
-    };
+    MAT_PRINT(t);
 
-    Mat to = {
-        .rows = t.rows,
-        .cols = 1,
-        .stride = t.stride,
-        .es = &MAT_AT(t, 0, ti.cols),
-    };
-
-    // const char *out_file_path = "img.mat";
-    // FILE *out = fopen(out_file_path, "wb");
-    // if (out == NULL) {
-    //     fprintf(stderr, "ERROR: could not open file %s\n", out_file_path);
-    //     return 1;
-    // }
-    // mat_save(out, t);
-
-    // printf("Generated %s from %s\n", out_file_path, img_file_path);
-
-    size_t arch[] = {2, 7, 4, 1};
+    size_t arch[] = {2, 7, 7, 1};
     NN nn = nn_alloc(arch, ARRAY_LEN(arch));
     NN g  = nn_alloc(arch, ARRAY_LEN(arch));
     nn_rand(nn, -1, 1);
@@ -198,19 +177,21 @@ int main(int argc, char **argv)
         }
     }
     UpdateTexture(train_texture, train_image.data);
-    int preview_width = 128;
-    int preview_height = 128;
+    int preview_width = 28;
+    int preview_height = 28;
     Image preview_image = GenImageColor(preview_width, preview_height, BLACK);
     Texture2D preview_texture = LoadTextureFromImage(preview_image);
 
     size_t epoch = 0;
-    size_t epoch_max = 1000*1000;
+    size_t epoch_max = 100*1000;
+    size_t epochs_per_frame = 103;
+    size_t batches_per_frame = 280;
+    size_t batch_size = 28;
+    size_t batch_count = (t.rows + batch_size - 1)/batch_size;
+    size_t batch_begin = 0;
+    float average_cost = 0.f;
     float rate = 0.5f;
-    int w, h;
-    int font_size;
-    char buffers[256];
-    // char *status;
-    int rw, rh, rx, ry;
+
 
     bool paused = true;
 
@@ -225,28 +206,59 @@ int main(int argc, char **argv)
             plot.count = 0;
         }
 
-        for (size_t i = 0; i < 100 && !paused && epoch < epoch_max; ++i) {
-            nn_backprop(nn, g, ti, to);
+        for (size_t i = 0; i < batches_per_frame && !paused && epoch < epoch_max; ++i) {
+            size_t size = batch_size;
+            if (batch_begin + batch_size >= t.rows) {
+                size = t.rows - batch_begin;
+            }
+
+            Mat batch_ti = {
+                .rows = size,
+                .cols = 2,
+                .stride = t.stride,
+                .es = &MAT_AT(t, batch_begin, 0),
+            };
+
+            Mat batch_to = {
+                .rows = size,
+                .cols = 1,
+                .stride = t.stride,
+                .es = &MAT_AT(t, batch_begin, batch_ti.cols),
+            };
+
+            nn_backprop(nn, g, batch_ti, batch_to);
             nn_learn(nn, g, rate);
-            epoch += 1;
-            da_append(&plot, nn_cost(nn, ti, to));
+            average_cost += nn_cost(nn, batch_ti, batch_to);
+            batch_begin += batch_size;
+
+            if (batch_begin >= t.rows) {
+                epoch += 1;
+                da_append(&plot, average_cost/batch_count);
+                average_cost = 0.0f;
+                batch_begin = 0;
+                // mat_shuffle_rows(t);
+            }
         }
         
         Color background_color = { 0x18, 0x18, 0x18, 0xFF };
         BeginDrawing();
         ClearBackground(background_color);
         {
+            int w, h;
             w = GetRenderWidth();
             h = GetRenderHeight();
 
-            font_size = 50*((float)h/(float)WINDOW_HEIGHT);
+            int font_size = 50*((float)h/(float)WINDOW_HEIGHT);
 
-            snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu, Cost: %f", epoch, epoch_max, nn_cost(nn, ti, to)); 
+            char buffers[256];
+            snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu\nCost: %f", epoch, epoch_max, plot.count > 0 ? plot.items[plot.count - 1] : 0); 
             DrawText(buffers, 0, 0, font_size, WHITE);
 
-            // status = !paused ? "RUNNING (SPACE to pause)" : "PAUSED (SPACE to start)";
+            // char *status = !paused ? "RUNNING (SPACE to pause)" : "PAUSED (SPACE to start)";
             // DrawText("RESET: R", 0, h - font_size, font_size / 2, LIGHTGRAY);
             // DrawText(status, 0, h - font_size/2, font_size / 2, LIGHTGRAY);
+            
+            int rw, rh, rx, ry;
 
             rw = w/3;
             rh = h*2/3;
@@ -279,7 +291,7 @@ int main(int argc, char **argv)
         }
         EndDrawing();
     }
-    printf("cost = %f\n", nn_cost(nn, ti, to));
+    // printf("cost = %f\n", nn_cost(nn, ti, to));
 
     for (size_t y = 0; y < (size_t)img_height; ++y) {
         for (size_t x = 0; x < (size_t)img_width; ++x) {
