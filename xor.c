@@ -4,9 +4,9 @@
 #define NN_IMPLEMENTATION
 #include "nn.h"
 #define OLIVEC_IMPLEMENTATION
-#include "olive.c"
+#include "thirdparty/olive.c"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "thirdparty/stb_image_write.h"
 
 #define IMG_WIDTH 800
 #define IMG_HEIGHT 600

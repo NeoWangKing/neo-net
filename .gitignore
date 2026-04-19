@@ -7,3 +7,5 @@
 !*.arch
 !*.mat
 !pdf/
+!*.png
+!thirdparty/

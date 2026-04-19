@@ -8,7 +8,7 @@
 #include <float.h>
 #include "raylib.h"
 #define SV_IMPLEMENTATION
-#include "sv.h"
+#include "thirdparty/sv.h"
 #define NN_IMPLEMENTATION
 #include "nn.h"
 
@@ -51,8 +51,8 @@ char *args_shift(int *argc, char ***argv)
 
 void cost_plot_minmax(Cost_Plot plot, float *min, float *max)
 {
-    *min = FLT_MIN;
-    *max = FLT_MIN;
+    *min = FLT_MAX;
+    *max = -FLT_MAX;
     for (size_t i = 0; i < plot.count; ++i) {
         if (*max < plot.items[i]) *max = plot.items[i];
         if (*min > plot.items[i]) *min = plot.items[i];
@@ -67,7 +67,8 @@ void plot_cost(Cost_Plot plot, int rw, int rh, int rx, int ry)
     if (min > 0) min = 0;
     size_t n = plot.count;
     if (n < 500) n = 500;
-    // DrawLineEx((Vector2){0, ry+rh}, (Vector2){rw, ry+rh}, rh*0.005f, RED);
+    DrawLineEx((Vector2){0, ry+rh}, (Vector2){rw, ry+rh}, rh*0.005f, WHITE);
+    DrawText("0", 0, ry+rh, 25, WHITE);
     for (size_t i = 0; i+1 < plot.count; ++i) {
         float x1 = rx + (float)rw/n*i;
         float y1 = ry + (1.0f - (plot.items[i] - min)/(max - min))*rh;
@@ -103,9 +104,9 @@ void nn_render_raylib(NN nn, int rw, int rh, int rx, int ry)
                 for (size_t j = 0; j < nn.as[l+1].cols; ++j) {
                     int cx2 = nn_x + (l+1)*layer_hpad + layer_hpad/2;
                     int cy2 = nn_y + j*layer_vpad2 + layer_vpad2/2;
-                    float value = sigmoidf(MAT_AT(nn.ws[l], j, i));
+                    float value = sigmoidf(MAT_AT(nn.ws[l], i, j));
                     high_color.a = floorf(255.f*value);
-                    float thick = 0.004*rh*fabs((value*2 - 1));
+                    float thick = 0.005*rh*fabs((value*2 - 1));
                     Vector2 start = { cx1, cy1 };
                     Vector2 end   = { cx2, cy2 };
                     DrawLineEx(start, end, thick, ColorAlphaBlend(low_color, high_color, WHITE));
@@ -197,6 +198,7 @@ int main(int argc, char **argv)
     float rate = 1;
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(IMG_WIDTH, IMG_HEIGHT, "gym");
     SetTargetFPS(120);
     Cost_Plot plot = {0};
@@ -208,9 +210,21 @@ int main(int argc, char **argv)
     int w, h;
     int font_size = 50;
 
+    bool training = false;
+
     while (!WindowShouldClose()) {
-        for (size_t i = 0; i < 10 && epoch < epoch_max; ++i) {
-            if (epoch < epoch_max) {
+        if (IsKeyPressed(KEY_SPACE)) {
+            training = !training;
+        }
+
+        if (IsKeyPressed(KEY_R)) {
+            nn_rand(nn, 0, 1);
+            epoch = 0;
+            plot.count = 0;
+        }
+
+        if (training) {
+            for (size_t i = 0; i < 10 && epoch < epoch_max; ++i) {
                 nn_backprop(nn, g, ti, to);
                 nn_learn(nn, g, rate);
                 epoch += 1;
@@ -226,8 +240,12 @@ int main(int argc, char **argv)
             h = GetRenderHeight();
             font_size = 50*((float)h/(float)IMG_HEIGHT);
 
-            snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu\nCost: %f", epoch, epoch_max, nn_cost(nn, ti, to)); 
+            snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu, Cost: %f", epoch, epoch_max, nn_cost(nn, ti, to)); 
             DrawText(buffers, 0, 0, font_size, WHITE);
+
+            const char *status = training ? "RUNNING (SPACE to pause)" : "PAUSED (SPACE to start)";
+            DrawText("RESET: R", 0, h - font_size, font_size / 2, LIGHTGRAY);
+            DrawText(status, 0, h - font_size/2, font_size / 2, LIGHTGRAY);
 
             rw = w/2;
             rh = h*2/3;

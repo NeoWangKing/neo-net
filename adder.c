@@ -5,7 +5,7 @@
 #define NN_IMPLEMENTATION
 #include "nn.h"
 
-#include "raylib.h"
+#include <raylib.h>
 
 #define BITS 4
 
