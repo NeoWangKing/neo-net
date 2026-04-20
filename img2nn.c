@@ -12,7 +12,7 @@
 #include "thirdparty/stb_image_write.h"
 
 #define NN_IMPLEMENTATION
-#define NN_ENABLED_GYM
+#define NN_ENABLE_GYM
 #include "nn.h"
 
 size_t arch[] = {3, 11, 11, 9, 1};

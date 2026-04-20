@@ -3,7 +3,7 @@
 #include <float.h>
 
 #define NN_IMPLEMENTATION
-#define NN_ENABLED_GYM
+#define NN_ENABLE_GYM
 #include "nn.h"
 
 size_t arch[] = {2, 2, 1};

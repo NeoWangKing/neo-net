@@ -73,7 +73,7 @@ void  nn_learn(NN nn, NN g, float rate);
 void  nn_print(NN nn, const char *name);
 #define NN_PRINT(nn) nn_print(nn, #nn)
 
-#ifdef NN_ENABLED_GYM
+#ifdef NN_ENABLE_GYM
 #include <float.h>
 #include <raylib.h>
 #include <raymath.h>
@@ -106,7 +106,7 @@ void gym_render_nn(NN nn, float rx, float ry, float rw, float rh);
 void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh);
 void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, float rate);
 
-#endif // NN_ENABLED_GYM
+#endif // NN_ENABLE_GYM
 
 #endif // NN_H_
 
@@ -509,7 +509,7 @@ void nn_print(NN nn, const char *name)
     printf("]\n");
 }
 
-#ifdef NN_ENABLED_GYM
+#ifdef NN_ENABLE_GYM
 #include <raylib.h>
 
 void gym_render_nn(NN nn, float rx, float ry, float rw, float rh)
@@ -617,6 +617,6 @@ void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, flo
     }
 }
 
-#endif // NN_ENABLED_GYM
+#endif // NN_ENABLE_GYM
 
 #endif // NN_IMPLEMANTATION
