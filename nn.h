@@ -69,6 +69,7 @@ void  nn_forward(NN nn);
 float nn_cost(NN nn, Mat ti, Mat to);
 void  nn_finite_diff(NN nn, NN g, float eps, Mat ti, Mat to);
 void  nn_backprop(NN nn, NN g, Mat ti, Mat to);
+void  nn_backprop_traditional(NN nn, NN g, Mat ti, Mat to);
 void  nn_learn(NN nn, NN g, float rate);
 void  nn_print(NN nn, const char *name);
 #define NN_PRINT(nn) nn_print(nn, #nn)
@@ -88,7 +89,7 @@ typedef struct {
     float *items;
     size_t count;
     size_t capacity;
-} Plot;
+} Gym_Plot;
 
 #define DA_INIT_CAP 256
 #define da_append(da, item)                                                         \
@@ -103,7 +104,8 @@ typedef struct {
     } while (0)
 
 void gym_render_nn(NN nn, float rx, float ry, float rw, float rh);
-void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh);
+void gym_plot_cost(Gym_Plot plot, int rx, int ry, int rw, int rh);
+void gym_slider(float *value, bool *dragging, float rx, float ry, float rw, float rh);
 void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, float rate);
 
 #endif // NN_ENABLE_GYM
@@ -153,11 +155,17 @@ void  mat_save(FILE *out, Mat m)
 Mat mat_load(FILE *in)
 {
     uint64_t magic;
-    fread(&magic, sizeof(magic), 1, in);
+    if (!fread(&magic, sizeof(magic), 1, in)) {
+        fprintf(stderr, "ERROR: could not load magic");
+    }
     NN_ASSERT(magic == 0x74616d2e682e6e6e);
     size_t rows, cols;
-    fread(&rows, sizeof(rows), 1, in);
-    fread(&cols, sizeof(cols), 1, in);
+    if (!fread(&rows, sizeof(rows), 1, in)) {
+        fprintf(stderr, "ERROR: could not load rows");
+    }
+    if (!fread(&cols, sizeof(cols), 1, in)) {
+        fprintf(stderr, "ERROR: could not load cols");
+    }
     Mat m = mat_alloc(rows, cols);
 
     size_t n = fread(m.es, sizeof(*m.es), rows*cols, in);
@@ -480,6 +488,49 @@ void  nn_backprop(NN nn, NN g, Mat ti, Mat to)
     }
 }
 
+void  nn_backprop_traditional(NN nn, NN g, Mat ti, Mat to)
+{
+    NN_ASSERT(ti.rows == to.rows);
+    size_t n = ti.rows;
+    NN_ASSERT(NN_OUTPUT(nn).cols == to.cols);
+
+    nn_zero(g);
+
+    // i - current sample
+    // l - current layer
+    // j - current activation
+    // k - previous activation
+
+    for (size_t i = 0; i < n; ++i) {
+        mat_copy(NN_INPUT(nn), mat_row(ti, i));
+        nn_forward(nn);
+
+        for (size_t j = 0; j <= nn.count; ++j) {
+            mat_fill(g.as[j], 0);
+        }
+
+        for (size_t j = 0; j < to.cols; ++j) {
+            MAT_AT(NN_OUTPUT(g), 0, j) = (MAT_AT(NN_OUTPUT(nn), 0, j) - MAT_AT(to, i, j))*2/n;
+        }
+
+        for (size_t l = nn.count; l > 0; --l) {
+            for (size_t j = 0; j < nn.as[l].cols; ++j) {
+                float a = MAT_AT(nn.as[l], 0, j);
+                float da = MAT_AT(g.as[l], 0, j);
+                MAT_AT(g.bs[l-1], 0, j) += da*a*(1 - a);
+                for (size_t k = 0; k < nn.as[l-1].cols; ++k) {
+                    // j - weight matrix col
+                    // k - weight matrix row
+                    float pa = MAT_AT(nn.as[l-1], 0, k);
+                    float w = MAT_AT(nn.ws[l-1], k, j);
+                    MAT_AT(g.ws[l-1], k, j) += da*a*(1 - a)*pa;
+                    MAT_AT(g.as[l-1], 0, k) += da*a*(1 - a)*w;
+                }
+            }
+        }
+    }
+}
+
 void nn_learn(NN nn, NN g, float rate)
 {
     for (size_t i = 0; i < nn.count; ++i) {
@@ -510,7 +561,6 @@ void nn_print(NN nn, const char *name)
 }
 
 #ifdef NN_ENABLE_GYM
-#include <raylib.h>
 
 void gym_render_nn(NN nn, float rx, float ry, float rw, float rh)
 {
@@ -555,7 +605,7 @@ void gym_render_nn(NN nn, float rx, float ry, float rw, float rh)
     }
 }
 
-void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh)
+void gym_plot_cost(Gym_Plot plot, int rx, int ry, int rw, int rh)
 {
     float min = FLT_MAX, max = FLT_MIN;
     for (size_t i = 0; i < plot.count; ++i) {
@@ -576,6 +626,42 @@ void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh)
     float y0 = ry + (1 - (0 - min)/(max - min))*rh;
     DrawLineEx((Vector2){ rx + 0, y0 }, (Vector2){ rx + rw - 1, y0 }, rh*0.005f, WHITE);
     DrawText("0", rx + 0, y0 - rh*0.04, rh*0.04, WHITE);
+}
+
+void gym_slider(float *value, bool *dragging, float rx, float ry, float rw, float rh)
+{
+    float knob_radius = rh;
+    Vector2 bar_size = {
+        .x = rw - 2*knob_radius,
+        .y = rh*0.25,
+    };
+    Vector2 bar_position = {
+        .x = rx + knob_radius,
+        .y = ry + rh/2 - bar_size.y/2,
+    };
+    DrawRectangleV(bar_position, bar_size, RAYWHITE);
+
+    Vector2 knob_position = {
+        .x = bar_position.x + bar_size.x*(*value),
+        .y = ry + rh/2,
+    };
+    DrawCircleV(knob_position, knob_radius, CLITERAL(Color) { 0xFF, 0x55, 0x55, 0xFF });
+
+    if (*dragging) {
+        float x = GetMousePosition().x;
+        if (x < bar_position.x) x = bar_position.x;
+        if (x > bar_position.x + bar_size.x) x = bar_position.x + bar_size.x;
+        *value = (x - bar_position.x)/bar_size.x;
+    }
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (Vector2Distance(GetMousePosition(), knob_position) <= knob_radius) {
+            *dragging = true;
+        }
+    }
+    if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        *dragging = false;
+    }
 }
 
 void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, float rate)
@@ -616,7 +702,7 @@ void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, flo
         gb->finished = true;
     }
 }
-
+          
 #endif // NN_ENABLE_GYM
 
 #endif // NN_IMPLEMANTATION

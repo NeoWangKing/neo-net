@@ -71,7 +71,7 @@ int main(void)
     Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 72, NULL, 0);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
 
-    Plot plot = {0};
+    Gym_Plot plot = {0};
 
     size_t epoch = 0;
     while (!WindowShouldClose()) {

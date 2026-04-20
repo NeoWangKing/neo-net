@@ -1,3 +1,4 @@
+#include <stddef.h>
 #define NN_IMPLEMENTATION
 #define NN_ENABLE_GYM
 #include "nn.h"
@@ -5,8 +6,10 @@
 #define BITS 4
 
 size_t arch[] = {2*BITS, 4*BITS, BITS + 1};
+size_t epoch = 0;
 size_t max_epoch = 100*1000;
-size_t epochs_per_frame = 103;
+size_t batches_per_frame = 280;
+size_t batch_size = 28;
 float rate = 1.0f;
 bool paused = true;
 
@@ -107,12 +110,12 @@ int main(void)
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "xor");
     SetTargetFPS(60);
 
-    Font font = LoadFontEx("./fonts/iosevka-regular.ttf", 72, NULL, 0);
+    Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 72, NULL, 0);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
 
-    Plot plot = {0};
+    Gym_Plot plot = {0};
 
-    size_t epoch = 0;
+    Gym_Batch gb = {0};
 
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) {
@@ -124,11 +127,13 @@ int main(void)
             plot.count = 0;
         }
 
-        for (size_t i = 0; i < epochs_per_frame && !paused && epoch < max_epoch; ++i) {
-            nn_backprop(nn, g, ti, to);
-            nn_learn(nn, g, rate);
-            epoch += 1;
-            da_append(&plot, nn_cost(nn, ti, to));
+        for (size_t i = 0; i < batches_per_frame && !paused && epoch < max_epoch; ++i) {
+            gym_process_batch(&gb, batch_size, nn, g, t, rate);
+            if (gb.finished) {
+                epoch += 1;
+                da_append(&plot, gb.cost);
+                mat_shuffle_rows(t);
+            }
         }
 
         BeginDrawing();

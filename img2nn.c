@@ -15,13 +15,12 @@
 #define NN_ENABLE_GYM
 #include "nn.h"
 
-size_t arch[] = {3, 11, 11, 9, 1};
-size_t epoch = 0;
+size_t arch[] = {3, 11, 11, 11, 11, 11, 1};
 size_t epoch_max = 100*1000;
-// size_t epochs_per_frame = 103;
 size_t batches_per_frame = 280;
 size_t batch_size = 28;
 float rate = 0.5f;
+float scroll = 0.f;
 
 char *args_shift(int *argc, char ***argv)
 {
@@ -117,7 +116,7 @@ int main(int argc, char **argv)
     Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 50, 0, 250);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
 
-    Plot plot = {0};
+    Gym_Plot plot = {0};
 
     Image train_image1 = GenImageColor(img1_width, img1_height, BLACK);
     for (size_t y = 0; y < (size_t)img1_height; ++y) {
@@ -155,9 +154,9 @@ int main(int argc, char **argv)
     Gym_Batch gb = {0};
     bool paused = true;
 
-    float scroll = 0.5f;
     bool scroll_dragging = false;
     bool rate_dragging = false;
+    size_t epoch = 0;
 
     while (!WindowShouldClose()) {
         // some window behaviour
@@ -252,38 +251,6 @@ int main(int argc, char **argv)
 
             int rw, rh, rx, ry;
 
-            {
-                int padding = 10;
-                rw = w - padding*2;
-                rh = 5;
-                rx = padding;
-                ry = (h/2 - h/3) - padding - rh;
-                Vector2 scrollbar_position = { rx, ry };
-                Vector2 scrollbar_size = { rw, rh };
-                DrawRectangleV(scrollbar_position, scrollbar_size, RAYWHITE);
-
-                ry += rh/2;
-                int knob_radius = 10;
-                Vector2 knob_position = { rx + rate * rw, ry };
-                DrawCircleV(knob_position, knob_radius, CLITERAL(Color) { 0xFF, 0x55, 0x55, 0xFF });
-
-                if (rate_dragging) {
-                    float x = GetMousePosition().x;
-                    if (x < scrollbar_position.x) x = scrollbar_position.x;
-                    if (x > scrollbar_position.x + scrollbar_size.x) x = scrollbar_position.x + scrollbar_size.x;
-                    rate = (x - scrollbar_position.x)/scrollbar_size.x;
-                }
-
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    if (Vector2Distance(GetMousePosition(), knob_position) <= knob_radius) {
-                        rate_dragging = true;
-                    }
-                }
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-                    rate_dragging = false;
-                }
-            }
-
             rw = w/3;
             rh = h*2/3;
             rx = 0;
@@ -322,41 +289,18 @@ int main(int argc, char **argv)
                 ry += rh;
                 UpdateTexture(preview_texture3, preview_image3.data);
                 DrawTextureEx(preview_texture3, CLITERAL(Vector2) { rx + scroll*rw, ry }, 0, preview_image3_scale, WHITE);
-
-                int padding = 10;
-                ry += rh + padding;
+                float pad = rh*0.05;
+                ry = ry + rh + pad;
                 rw *= 2;
-                rh = 5;
-                Vector2 scrollbar_position = { rx, ry };
-                Vector2 scrollbar_size = { rw, rh };
-                DrawRectangleV(scrollbar_position, scrollbar_size, RAYWHITE);
-
-                ry += rh/2;
-                int knob_radius = 10;
-                Vector2 knob_position = { rx + scroll * rw, ry };
-                DrawCircleV(knob_position, knob_radius, CLITERAL(Color) { 0xFF, 0x55, 0x55, 0xFF });
-
-                if (scroll_dragging) {
-                    float x = GetMousePosition().x;
-                    if (x < scrollbar_position.x) x = scrollbar_position.x;
-                    if (x > scrollbar_position.x + scrollbar_size.x) x = scrollbar_position.x + scrollbar_size.x;
-                    scroll = (x - scrollbar_position.x)/scrollbar_size.x;
-                }
-
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    if (Vector2Distance(GetMousePosition(), knob_position) <= knob_radius) {
-                        scroll_dragging = true;
-                    }
-                }
-                if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-                    scroll_dragging = false;
-                }
+                rh = rh*0.02;
+                gym_slider(&scroll, &scroll_dragging, rx, ry, rw, rh);
             }
 
             int font_size = 50*((float)h/(float)WINDOW_HEIGHT);
             char buffers[256];
             snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu, Rate: %f, Cost: %f", epoch, epoch_max, rate, plot.count > 0 ? plot.items[plot.count - 1] : 0); 
             DrawTextEx(font, buffers, CLITERAL(Vector2){ 0, 0 }, font_size, 0, WHITE);
+            gym_slider(&rate, &rate_dragging, 0, h*0.08, w, h*0.02);
 
             char *status = !paused ? "RUNNING (SPACE to pause)" : "PAUSED (SPACE to start)";
             DrawTextEx(font, "RESET: [R], SAVE: [S]", CLITERAL(Vector2){ 0, h - font_size*2 }, font_size, 0, LIGHTGRAY);
