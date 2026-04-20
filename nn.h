@@ -73,6 +73,41 @@ void  nn_learn(NN nn, NN g, float rate);
 void  nn_print(NN nn, const char *name);
 #define NN_PRINT(nn) nn_print(nn, #nn)
 
+#ifdef NN_ENABLED_GYM
+#include <float.h>
+#include <raylib.h>
+#include <raymath.h>
+
+typedef struct {
+    size_t begin;
+    float cost;
+    bool finished;
+} Gym_Batch;
+
+typedef struct {
+    float *items;
+    size_t count;
+    size_t capacity;
+} Plot;
+
+#define DA_INIT_CAP 256
+#define da_append(da, item)                                                         \
+    do {                                                                            \
+        if ((da)->count >= (da)->capacity) {                                        \
+            (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;  \
+            (da)->items = realloc((da)->items, (da)->capacity*sizeof(*(da)->items));\
+            assert((da)->items != NULL && "Buy more RAM lol");                      \
+        }                                                                           \
+                                                                                    \
+        (da)->items[(da)->count++] = (item);                                        \
+    } while (0)
+
+void gym_render_nn(NN nn, float rx, float ry, float rw, float rh);
+void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh);
+void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, float rate);
+
+#endif // NN_ENABLED_GYM
+
 #endif // NN_H_
 
 // ==================================================================================
@@ -321,19 +356,6 @@ void  nn_zero(NN nn)
     mat_fill(nn.as[nn.count], 0);
 }
 
-void nn_print(NN nn, const char *name)
-{
-    char buf[256];
-    printf("%s = [\n", name);
-    for (size_t i = 0; i < nn.count; ++i) {
-        snprintf(buf, sizeof(buf), "ws[%zu]", i);
-        mat_print(nn.ws[i], buf, 4);
-        snprintf(buf, sizeof(buf), "bs[%zu]", i);
-        mat_print(nn.bs[i], buf, 4);
-    }
-    printf("]\n");
-}
-
 void nn_rand(NN nn, float low, float high)
 {
     for (size_t i = 0; i < nn.count; ++i) {
@@ -473,5 +495,128 @@ void nn_learn(NN nn, NN g, float rate)
         }
     }
 }
+
+void nn_print(NN nn, const char *name)
+{
+    char buf[256];
+    printf("%s = [\n", name);
+    for (size_t i = 0; i < nn.count; ++i) {
+        snprintf(buf, sizeof(buf), "ws[%zu]", i);
+        mat_print(nn.ws[i], buf, 4);
+        snprintf(buf, sizeof(buf), "bs[%zu]", i);
+        mat_print(nn.bs[i], buf, 4);
+    }
+    printf("]\n");
+}
+
+#ifdef NN_ENABLED_GYM
+#include <raylib.h>
+
+void gym_render_nn(NN nn, float rx, float ry, float rw, float rh)
+{
+    Color low_color = { 0xFF, 0x55, 0x55, 0xFF };
+    Color high_color = { 0x55, 0xFF, 0xFF, 0xFF };
+
+    float neuron_radius = rh*0.03;
+    int layer_border_vpad = rh*0.08;
+    int layer_border_hpad = rw*0.06;
+    int nn_width = rw - 2*layer_border_hpad;
+    int nn_height = rh - 2*layer_border_vpad;
+    int nn_x = rx + rw/2 - nn_width/2;
+    int nn_y = ry + rh/2 - nn_height/2;
+    size_t arch_count = nn.count + 1;
+    int layer_hpad = nn_width / arch_count;
+    for (size_t l = 0; l < arch_count; ++l) {
+        int layer_vpad1 = nn_height/nn.as[l].cols;
+        for (size_t i = 0; i < nn.as[l].cols; ++i) {
+            int cx1 = nn_x + l*layer_hpad + layer_hpad/2;
+            int cy1 = nn_y + i*layer_vpad1 + layer_vpad1/2;
+            if (l+1 < arch_count) {
+                int layer_vpad2 = nn_height/nn.as[l+1].cols;
+                for (size_t j = 0; j < nn.as[l+1].cols; ++j) {
+                    int cx2 = nn_x + (l+1)*layer_hpad + layer_hpad/2;
+                    int cy2 = nn_y + j*layer_vpad2 + layer_vpad2/2;
+                    float value = sigmoidf(MAT_AT(nn.ws[l], i, j));
+                    high_color.a = floorf(255.f*value);
+                    float thick = 0.005*rh*fabsf((value*2 - 1));
+                    // float thick = 0.005*rh;
+                    Vector2 start = { cx1, cy1 };
+                    Vector2 end   = { cx2, cy2 };
+                    DrawLineEx(start, end, thick, ColorAlphaBlend(low_color, high_color, WHITE));
+                }
+            }
+            if (l > 0) {
+                high_color.a = floorf(255.f*sigmoidf(MAT_AT(nn.bs[l-1], 0, i)));
+                DrawCircle(cx1, cy1, (int)neuron_radius, ColorAlphaBlend(low_color, high_color, WHITE));
+            } else {
+                DrawCircle(cx1, cy1, (int)neuron_radius, GRAY);
+            }
+        }
+    }
+}
+
+void gym_plot_cost(Plot plot, int rx, int ry, int rw, int rh)
+{
+    float min = FLT_MAX, max = FLT_MIN;
+    for (size_t i = 0; i < plot.count; ++i) {
+        if (max < plot.items[i]) max = plot.items[i];
+        if (min > plot.items[i]) min = plot.items[i];
+    }
+    if (min > 0) min = 0;
+    size_t n = plot.count;
+    if (n < 1000) n = 1000;
+    for (size_t i = 0; i+1 < plot.count; ++i) {
+        float x1 = rx + (float)rw/n*i;
+        float y1 = ry + (1.0f - (plot.items[i] - min)/(max - min))*rh;
+        float x2 = rx + (float)rw/n*(i+1);
+        float y2 = ry + (1.0f - (plot.items[i+1] - min)/(max - min))*rh;
+        DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, rh*0.005f, RED);
+    }
+
+    float y0 = ry + (1 - (0 - min)/(max - min))*rh;
+    DrawLineEx((Vector2){ rx + 0, y0 }, (Vector2){ rx + rw - 1, y0 }, rh*0.005f, WHITE);
+    DrawText("0", rx + 0, y0 - rh*0.04, rh*0.04, WHITE);
+}
+
+void gym_process_batch(Gym_Batch *gb, size_t batch_size, NN nn, NN g, Mat t, float rate)
+{
+    if (gb->finished) {
+        gb->finished = false;
+        gb->begin = 0;
+        gb->cost = 0;
+    }
+
+    size_t size = batch_size;
+    if (gb->begin + batch_size >= t.rows)  {
+        size = t.rows - gb->begin;
+    }
+
+    Mat batch_ti = {
+        .rows = size,
+        .cols = NN_INPUT(nn).cols,
+        .stride = t.stride,
+        .es = &MAT_AT(t, gb->begin, 0),
+    };
+
+    Mat batch_to = {
+        .rows = size,
+        .cols = NN_OUTPUT(nn).cols,
+        .stride = t.stride,
+        .es = &MAT_AT(t, gb->begin, batch_ti.cols),
+    };
+
+    nn_backprop(nn, g, batch_ti, batch_to);
+    nn_learn(nn, g, rate);
+    gb->cost += nn_cost(nn, batch_ti, batch_to);
+    gb->begin += batch_size;
+
+    if (gb->begin >= t.rows) {
+        size_t batch_count = (t.rows + batch_size - 1)/batch_size;
+        gb->cost /= batch_count;
+        gb->finished = true;
+    }
+}
+
+#endif // NN_ENABLED_GYM
 
 #endif // NN_IMPLEMANTATION
