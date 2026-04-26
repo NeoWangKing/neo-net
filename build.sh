@@ -10,3 +10,4 @@ gcc $CFLAGS `pkg-config --cflags raylib` -o xor_gen xor_gen.c $LIBS `pkg-config 
 gcc $CFLAGS `pkg-config --cflags raylib` -o adder_gen adder_gen.c $LIBS `pkg-config --libs raylib` -lglfw -ldl -lpthread -lX11 -lXrandr -lXinerama -lXi -lXcursor
 gcc $CFLAGS `pkg-config --cflags raylib` -o img2nn img2nn.c $LIBS `pkg-config --libs raylib` -lglfw -ldl -lpthread -lX11 -lXrandr -lXinerama -lXi -lXcursor
 
+# ./img2nn ./mnist/train/8/train_image_10001.png ./mnist/train/6/train_image_10017.png
