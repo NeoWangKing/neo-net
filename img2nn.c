@@ -244,14 +244,17 @@ int main(int argc, char **argv)
     // MAT_PRINT(t);
 
     // initialize the components
-    size_t WINDOW_FACTOR = 100;
+    size_t WINDOW_FACTOR = 80;
     size_t WINDOW_WIDTH = (16*WINDOW_FACTOR);
     size_t WINDOW_HEIGHT = (9*WINDOW_FACTOR);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
+    // SetConfigFlags(FLAG_WINDOW_HIGHDPI);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "img2mat");
-    SetTargetFPS(120);
+    SetTargetFPS(60);
+
+    // SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 50, 0, 250);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
@@ -417,7 +420,7 @@ int main(int argc, char **argv)
                 gym_slider(&scroll, &scroll_dragging, rx, ry, rw, rh);
             }
 
-            int font_size = 50*((float)h/(float)WINDOW_HEIGHT);
+            int font_size = 25*((float)h/(float)WINDOW_HEIGHT);
             char buffers[256];
             snprintf(buffers, sizeof(buffers), "Epoch: %zu/%zu, Rate: %f, Cost: %f", epoch, epoch_max, rate, plot.count > 0 ? plot.items[plot.count - 1] : 0); 
             DrawTextEx(font, buffers, CLITERAL(Vector2){ 0, 0 }, font_size, 0, WHITE);
@@ -429,6 +432,8 @@ int main(int argc, char **argv)
         }
         EndDrawing();
     }
+
+    CloseWindow();
 
     return 0;
 }

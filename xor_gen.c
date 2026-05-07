@@ -64,9 +64,11 @@ int main(void)
     size_t WINDOW_WIDTH = (16*WINDOW_FACTOR);
     size_t WINDOW_HEIGHT = (9*WINDOW_FACTOR);
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    // SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "xor");
     SetTargetFPS(60);
+
+    // SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 72, NULL, 0);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
