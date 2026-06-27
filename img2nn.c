@@ -256,7 +256,7 @@ int main(int argc, char **argv)
 
     // SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Medium.ttf", 50, 0, 250);
+    Font font = LoadFontEx("./font/JetBrainsMonoNerdFont-Regular.ttf", 50, 0, 250);
     SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
 
     Gym_Plot plot = {0};

@@ -2,31 +2,16 @@
 
 set -xe
 
+export PKG_CONFIG_PATH=$HOME/opt/raylib/lib/pkgconfig/:$PKG_CONFIG_PATH
+
 CFLAGS="-O3 -Wall -Wextra"
-LIBS="-lm"
+LIBS="-lm $(pkg-config --libs raylib) -lX11 -lXrandr -lXi -lXcursor -lXinerama -lpthread -ldl"
 
+gcc $CFLAGS `pkg-config --cflags raylib` -o xor_gen xor_gen.c $LIBS
 
-gcc $CFLAGS `pkg-config --cflags raylib` -o xor_gen xor_gen.c $LIBS `pkg-config --libs raylib` \
-    -framework CoreFoundation \
-    -framework CoreGraphics \
-    -framework CoreVideo \
-    -framework IOKit \
-    -framework Cocoa \
-    -framework OpenGL
-gcc $CFLAGS `pkg-config --cflags raylib` -o adder_gen adder_gen.c $LIBS `pkg-config --libs raylib` \
-    -framework CoreFoundation \
-    -framework CoreGraphics \
-    -framework CoreVideo \
-    -framework IOKit \
-    -framework Cocoa \
-    -framework OpenGL
-gcc $CFLAGS `pkg-config --cflags raylib` -o img2nn img2nn.c $LIBS `pkg-config --libs raylib` \
-    -framework CoreFoundation \
-    -framework CoreGraphics \
-    -framework CoreVideo \
-    -framework IOKit \
-    -framework Cocoa \
-    -framework OpenGL
+gcc $CFLAGS `pkg-config --cflags raylib` -o adder_gen adder_gen.c $LIBS
+
+gcc $CFLAGS `pkg-config --cflags raylib` -o img2nn img2nn.c $LIBS
 
 # gcc -O3 -Wall -Wextra \
 #     -o adder_gen adder_gen.c \
